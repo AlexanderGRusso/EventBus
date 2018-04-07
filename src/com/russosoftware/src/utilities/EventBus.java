@@ -63,10 +63,8 @@ public class EventBus
 	
 	public void registerEventBusListener(IEventListener eventListener)
 	{
-		
 		for(Method m : eventListener.getClass().getDeclaredMethods())
 		{
-
 			if(m.getParameterTypes().length == 1 && m.getParameterTypes()[0].getSuperclass().isAssignableFrom(IEvent.class))
 			{
 				Class<? extends IEvent> eventRegistering = (Class<? extends IEvent>) m.getParameterTypes()[0];
