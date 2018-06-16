@@ -7,11 +7,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.russosoftware.src.utilities.EventHandler.EventPriority;
+
 /**
  * Distributes events to register Event Listeners
  **/
 public class EventBus
 {
+	/**
+	 * HashMap constructed to contain the event busses registered to post the event and distribute it to the event listeners.
+	 **/
+	private static Map<String, EventBus> busMap = new HashMap<>();
+	
 	/**
 	 * Default EventBus
 	 **/
@@ -21,6 +28,8 @@ public class EventBus
 	{
 		try 
 		{
+			if(busMap == null) busMap = new HashMap<>();		/** In the event that the bus map has not been constructed, construct it to avoid a NullPointerException **/
+
 			INSTANCE = new EventBus();
 		} 
 		catch (IllegalBusNameException e) 
@@ -32,16 +41,10 @@ public class EventBus
 		}
 	}
 	
-	
-	/**
-	 * HashMap constructed to contain the event busses registered to post the event and distribute it to the event listeners.
-	 **/
-	private static Map<String, EventBus> busMap = new HashMap<>();
-	
 	/**
 	 * HashMap constructed to contain the event listeners registered to receive the event bus posting.
 	 **/
-	private HashMap<Class<? extends IEvent>, List<EventListenerPair>> eventMap = new HashMap<>();
+	private HashMap<Class<?>, HashMap<EventPriority, List<EventListenerPair>>> eventMap = new HashMap<>();
 	private final String busName;
 	
 	private EventBus() throws IllegalBusNameException
@@ -51,8 +54,7 @@ public class EventBus
 	}
 	
 	public EventBus(String busName) throws IllegalBusNameException
-	{
-		if(busMap == null) busMap = new HashMap<>();		/** In the event that the bus map has not been constructed, construct it to avoid a NullPointerException **/
+	{	
 		if(eventMap == null) eventMap = new HashMap<>();	/** In the event that the event map has not been constructed, construct it to avoid a NullPointerException **/
 		
 		if(!busMap.isEmpty() && busMap.containsKey(busName))
@@ -61,63 +63,85 @@ public class EventBus
 		this.busName = busName;
 	}
 	
-	public void registerEventBusListener(IEventListener eventListener)
+	public void registerEventBusListener(Object eventListener)
 	{
 		for(Method m : eventListener.getClass().getDeclaredMethods())
 		{
-			if(m.getParameterTypes().length == 1 && m.getParameterTypes()[0].getSuperclass().isAssignableFrom(IEvent.class))
+			if(m.isAnnotationPresent(EventHandler.class) && m.getParameterTypes().length == 1)
 			{
-				Class<? extends IEvent> eventRegistering = (Class<? extends IEvent>) m.getParameterTypes()[0];
+				EventHandler eventData = m.getAnnotation(EventHandler.class);
+				Class<?> eventRegistering = (Class<?>) m.getParameterTypes()[0];
 				
-				System.out.println(eventRegistering.getName() + " : " + eventListener.toString() + " : " + m.getName());
-				
-				if(eventMap.containsKey(eventRegistering))
-				{
-					eventMap.get(eventRegistering).add(new EventListenerPair(eventListener, m));
-					return;
-				}
-				List<EventListenerPair> newEventListenerList = new ArrayList<>();
-				newEventListenerList.add(new EventListenerPair(eventListener, m));
-				eventMap.put(eventRegistering, newEventListenerList);
+				addListener(eventData.priority(), eventRegistering, eventListener, m);
 			}
 		}
 	}
 	
-	public void post(IEvent event)
+	private void addListener(EventPriority priority, Class<?> eventRegistering, Object eventListener, Method m)
 	{
+		/**
+		* If the event we're registering a listener has not had any other listeners registered, construct a HashMap for that event.
+		* If the event has not had another listener registered with the same priority, construct a List for that priority.
+		* This keeps unnecessary Lists and Maps from being created.
+		**/
+		if(eventMap.get(eventRegistering) == null)
+			eventMap.put(eventRegistering, new HashMap<>());
+		if(eventMap.get(eventRegistering).get(priority) == null)
+			eventMap.get(eventRegistering).put(priority, new ArrayList<>());
+		
+		eventMap.get(eventRegistering).get(priority).add(new EventListenerPair(eventListener, m));
+	}
+	
+	public void post(Object event)
+	{
+		// If the event being posted has no registered listeners, don't bother posting to the bus.
 		if(!eventMap.containsKey(event.getClass())) return;
 		
-		for(EventListenerPair listener : eventMap.get(event.getClass()))
+		try 
 		{
-			try 
+			int numPriorities = EventPriority.values().length;
+			for(int i = numPriorities - 1; i >= 0; i--)
 			{
-				listener.methodInvoked.setAccessible(true);
-				listener.methodInvoked.invoke(listener.listenerObject, event);
-			} 
-			catch (IllegalAccessException e) 
-			{
-				e.printStackTrace();
-			} 
-			catch (IllegalArgumentException e) 
-			{
-				e.printStackTrace();
-			} 
-			catch (InvocationTargetException e) 
-			{
-				e.printStackTrace();
+				if(eventMap.get(event.getClass()).containsKey(EventPriority.values()[i]))
+				{					
+					// Post to all priority event buses, in order of priority.
+					for(EventListenerPair listener : eventMap.get(event.getClass()).get(EventPriority.values()[i]))
+					{
+						listener.postEvent(event);	
+					}
+				}
 			}
+		} 
+		catch (IllegalAccessException e) 
+		{
+			System.err.println("Java Reflection accessibility not changed. Set accessible!");
+			e.printStackTrace();
+		} 
+		catch (IllegalArgumentException e) 
+		{
+			e.printStackTrace();
+		} 
+		catch (InvocationTargetException e) 
+		{
+			e.printStackTrace();
 		}
 	}
 	
 	private class EventListenerPair
 	{
-		public final IEventListener listenerObject;
+		public final Object listenerObject;
 		public final Method methodInvoked;
 		
-		public EventListenerPair(IEventListener listener, Method invokedMethod)
+		public EventListenerPair(Object eventListener, Method invokedMethod)
 		{
-			this.listenerObject = listener;
+			this.listenerObject = eventListener;
 			this.methodInvoked = invokedMethod;
+		}
+
+		public void postEvent(Object event) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException 
+		{
+			this.methodInvoked.setAccessible(true);
+			this.methodInvoked.invoke(this.listenerObject, event);
 		}
 	}
 	

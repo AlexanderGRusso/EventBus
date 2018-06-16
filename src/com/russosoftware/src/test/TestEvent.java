@@ -1,12 +1,6 @@
 package com.russosoftware.src.test;
 
-import com.russosoftware.src.utilities.IEvent;
-
-class TestEvent implements IEvent
+class TestEvent
 {
-	@Override
-	public String[] getEventListenerMethods() 
-	{
-		return new String[]{"Test Worked!"};
-	}	
+	
 }
