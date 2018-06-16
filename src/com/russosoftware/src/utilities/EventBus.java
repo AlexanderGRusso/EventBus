@@ -50,7 +50,6 @@ public class EventBus
 	private EventBus() throws IllegalBusNameException
 	{
 		this("Default Bus");
-		EventBus.busMap.put("Default Bus", this);
 	}
 	
 	public EventBus(String busName) throws IllegalBusNameException
@@ -61,6 +60,8 @@ public class EventBus
 				throw new IllegalBusNameException("The name utilized for this bus has already been used. Please choose another.");
 		
 		this.busName = busName;
+		
+		EventBus.busMap.put(busName, this);
 	}
 	
 	public void registerEventBusListener(Object eventListener)
