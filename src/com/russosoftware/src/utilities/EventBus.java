@@ -20,7 +20,7 @@ public class EventBus
 	private static Map<String, EventBus> busMap = new HashMap<>();
 	
 	/**
-	 * Default EventBus
+	 * Default EventBus 
 	 **/
 	private static EventBus INSTANCE;
 	
@@ -151,8 +151,16 @@ public class EventBus
 		return this.busName;
 	}
 	
-	public static EventBus instance()
+	public static EventBus getDefaultBus()
 	{
 		return INSTANCE;
+	}
+
+	public static EventBus getEventBusByName(String busName) 
+	{
+		if(busMap.containsKey(busName))
+			return busMap.get(busName);
+		
+		return null;
 	}
 }

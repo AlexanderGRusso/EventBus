@@ -8,7 +8,7 @@ public class TestClass
 {
 	public static void main(String[] args)
 	{
-		EventBus bus = EventBus.instance();
+		EventBus bus = EventBus.getDefaultBus();
 		
 		bus.registerEventBusListener(new Object()
 		{
